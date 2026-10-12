@@ -6,8 +6,8 @@ Predicts which bank clients will subscribe to a term deposit, using the UCI Bank
 
 Bank marketing campaigns are costly, and most calls don't convert. The model ranks clients by likelihood to subscribe so outreach can focus on the most promising ones.
 
-- **Data:** UCI Bank Marketing ('bank-full.cs', ~45k rows)
-- **Target:** 'y' (subscribed to a term deposit)
+- **Data:** UCI Bank Marketing (`bank-full.csv`, ~45k rows)
+- **Target:** `y` (subscribed to a term deposit)
 - **Metric:** PR-AUC, because the classes are imbalanced
 - **Leakage control:** `duration` is dropped. It's only known after the call, so it can't be used for real prediction.
 
@@ -15,10 +15,10 @@ Bank marketing campaigns are costly, and most calls don't convert. The model ran
 
 | Step | Command | Output |
 |------|---------|--------|
-| Data prep | 'make prep' | Stratified 60/20/20 train/val/test parquet files + feature schema |
-| Baselines | 'make train' | HistGradientBoosting run logged to MLflow |
-| Tuning | 'make tune' | 30-trial Optuna search, all trials logged to MLflow |
-| Registry | 'make register' | Best model registered with a `champion` alias, evaluated once on the test set |
+| Data prep | `make prep` | Stratified 60/20/20 train/val/test parquet files + feature schema |
+| Baselines | `make train` | HistGradientBoosting run logged to MLflow |
+| Tuning | `make tune` | 30-trial Optuna search, all trials logged to MLflow |
+| Registry | `make register` | Best model registered with a `champion` alias, evaluated once on the test set |
 
 Run everything: `make pipeline`
 
@@ -31,7 +31,7 @@ Run everything: `make pipeline`
 | HistGradientBoosting | 0.476 |
 | HistGradientBoosting (tuned) | 0.482 |
 
-Test-set PR-AUC for the champion model: **0.456**. This is lower than the tuned validation score (0.482), as expected: the search optimizes against validation, so the held-out test set gives the unbiased estimate. For context, a random classifier scores about the positive rate 11.7%.
+Test-set PR-AUC for the champion model: **0.456**. This is lower than the tuned validation score (0.482), as expected: the search optimizes against validation, so the held-out test set gives the unbiased estimate. For context, a random classifier scores about the positive rate of 11.7%.
 
 ## Setup
 
