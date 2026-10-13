@@ -41,12 +41,12 @@ def make_model(trial: optuna.Trial, seed: int):
     )
 
 
-def main():
+def main(argv=None):
     p = argparse.ArgumentParser()
     p.add_argument("--model", default="hgb", choices=["hgb"])
     p.add_argument("--trials", type=int, default=30)
     p.add_argument("--seed", type=int, default=42)
-    args = p.parse_args()
+    args = p.parse_args(argv)
 
     mlflow.set_tracking_uri(TRACKING_URI)
     mlflow.set_experiment(EXPERIMENT)

@@ -60,7 +60,7 @@ def build_model(name: str, seed: int):
     raise ValueError(f"Unknown model: {name}")
 
 
-def main():
+def main(argv=None):
 
     mlflow.set_tracking_uri(TRACKING_URI)
     mlflow.set_experiment(EXPERIMENT)
@@ -68,7 +68,7 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--model", default="logreg", choices=["logreg", "rf", "hgb"])
     p.add_argument("--seed", type=int, default=42)
-    args = p.parse_args()
+    args = p.parse_args(argv)
 
     # mlflow.set_tracking_uri(TRACKING_URI)
     # mlflow.set_experiment(EXPERIMENT)

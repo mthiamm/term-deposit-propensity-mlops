@@ -19,6 +19,7 @@ Bank marketing campaigns are costly, and most calls don't convert. The model ran
 | Baselines | `make train` | HistGradientBoosting run logged to MLflow |
 | Tuning | `make tune` | 30-trial Optuna search, all trials logged to MLflow |
 | Registry | `make register` | Best model registered with a `champion` alias, evaluated once on the test set |
+| Orchestration | `make flow` | Runs all four steps as a Prefect flow, with a promotion gate |
 
 Run everything: `make pipeline`
 
@@ -30,8 +31,10 @@ Run everything: `make pipeline`
 | Random forest | 0.463 |
 | HistGradientBoosting | 0.476 |
 | HistGradientBoosting (tuned) | 0.482 |
+| HistGradientBoosting (tuned, champion) | 0.483 |
 
-Test-set PR-AUC for the champion model: **0.456**. This is lower than the tuned validation score (0.482), as expected: the search optimizes against validation, so the held-out test set gives the unbiased estimate. For context, a random classifier scores about the positive rate of 11.7%.
+
+Test-set PR-AUC for the champion model: **0.457**. This is lower than the tuned validation score (0.483), as expected: the search optimizes against validation, so the held-out test set gives the unbiased estimate. For context, a random classifier scores about the positive rate (0.11.7).
 
 ## Setup
 

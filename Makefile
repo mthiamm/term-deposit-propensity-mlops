@@ -1,4 +1,4 @@
-.PHONY: data prep train tune register pipeline
+.PHONY: data prep train tune register pipeline flow
 
 data:
 	wget -P data/raw "https://archive.ics.uci.edu/static/public/222/bank+marketing.zip"
@@ -18,3 +18,6 @@ register:
 	python -m src.register
 
 pipeline: prep train tune register
+
+flow:
+	DO_NOT_TRACK=1 PREFECT_SERVER_ANALYTICS_ENABLED=false python -m src.flow
