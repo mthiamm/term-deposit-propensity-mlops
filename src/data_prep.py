@@ -14,10 +14,12 @@ from pathlib import Path
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
+from src.features import BINARY_COLUMNS, TARGET, binarize_yes_no, encode
+
 RAW_DATA_PATH = Path("data/raw/bank-full.csv")
 PROCESSED_DIR = Path("data/processed")
 
-TARGET = "y"
+
 RANDOM_STATE = 42
 VAL_SIZE = 0.2  # 20% of the full data
 TEST_SIZE = 0.2  # 20% of the full data
@@ -50,14 +52,8 @@ def detect_column_types(df: pd.DataFrame) -> tuple[list[str], list[str]]:
 
 
 def clean_data(df: pd.DataFrame) -> pd.DataFrame:
-    df = df.copy()
     df = df.drop(columns=LEAKAGE_COLUMNS)
-
-    # Convert every yes/no column (including the target) to 1/0
-    for col in df.columns:
-        if set(df[col].unique()) <= {"yes", "no"}:
-            df[col] = (df[col] == "yes").astype(int)
-    return df
+    return binarize_yes_no(df, BINARY_COLUMNS + [TARGET])
 
 
 def split_data(df: pd.DataFrame):
@@ -95,14 +91,10 @@ def encode_features(
     X_val = val.drop(columns=TARGET)
     X_test = test.drop(columns=TARGET)
 
-    X_train = pd.get_dummies(X_train, dtype=int)
-    X_val = pd.get_dummies(X_val, dtype=int).reindex(
-        columns=X_train.columns, fill_value=0
-    )
-    X_test = pd.get_dummies(X_test, dtype=int).reindex(
-        columns=X_train.columns, fill_value=0
-    )
+    X_train = encode(X_train)
     feature_columns = X_train.columns.tolist()  # <- BEFORE reattaching y
+    X_val = encode(X_val, feature_columns)
+    X_test = encode(X_test, feature_columns)
 
     # Reattach target so we write single files
     X_train[TARGET] = y_train
