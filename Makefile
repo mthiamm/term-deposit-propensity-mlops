@@ -21,3 +21,12 @@ pipeline: prep train tune register
 
 flow:
 	DO_NOT_TRACK=1 PREFECT_SERVER_ANALYTICS_ENABLED=false python -m src.flow
+
+export:
+	python -m src.export_model
+
+docker-build: export
+	docker build -t term-deposit-api:0.1 .
+
+docker-run:
+	docker run --rm -p 8000:8000 term-deposit-api:0.1

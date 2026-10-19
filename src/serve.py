@@ -12,7 +12,9 @@ from typing import Literal
 import mlflow
 import pandas as pd
 from fastapi import FastAPI
-from mlflow.models import get_model_info
+
+# from mlflow.models import get_model_info
+from mlflow.models import Model
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.features import BINARY_COLUMNS, binarize_yes_no, encode
@@ -80,11 +82,15 @@ class Prediction(BaseModel):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Runs once at startup: load the champion model and its column list."""
-    mlflow.set_tracking_uri(TRACKING_URI)
-    info = get_model_info(MODEL_URI)
-    app.state.feature_columns = info.signature.inputs.input_names()
+
+    if MODEL_URI.startswith("models:/"):
+        mlflow.set_tracking_uri(TRACKING_URI)
+
+    # info = get_model_info(MODEL_URI)
+    meta = Model.load(MODEL_URI)  # reads the MLmodel file only, no database
+    app.state.feature_columns = meta.signature.inputs.input_names()
     app.state.model = mlflow.sklearn.load_model(MODEL_URI)
-    app.state.run_id = info.run_id
+    app.state.run_id = meta.run_id
     yield
 
 
