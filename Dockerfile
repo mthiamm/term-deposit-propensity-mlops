@@ -9,7 +9,7 @@ COPY requirements-serve.txt .
 RUN pip install --no-cache-dir -r requirements-serve.txt
 
 # Then the code and the model.
-COPY src/serve.py src/features.py src/
+COPY src/serve.py src/features.py src/schema.py src/
 COPY models/champion models/champion
 
 ENV MODEL_URI=models/champion

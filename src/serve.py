@@ -7,7 +7,7 @@ Docs UI (auto-generated): http://localhost:8000/docs
 
 import os
 from contextlib import asynccontextmanager
-from typing import Literal
+from src.schema import Customer
 
 import mlflow
 import pandas as pd
@@ -15,63 +15,13 @@ from fastapi import FastAPI
 
 # from mlflow.models import get_model_info
 from mlflow.models import Model
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel
 
 from src.features import BINARY_COLUMNS, binarize_yes_no, encode
 
 # Config comes from the environment so Docker can override it later.
 TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db")
 MODEL_URI = os.getenv("MODEL_URI", "models:/bank-marketing-classifier@champion")
-
-YesNo = Literal["yes", "no"]
-
-
-class Customer(BaseModel):
-    """One customer's raw attributes, exactly as the bank would hold them."""
-
-    model_config = ConfigDict(extra="forbid")  # reject unknown/typo'd fields
-
-    age: int = Field(ge=18, le=120)
-    job: Literal[
-        "admin.",
-        "blue-collar",
-        "entrepreneur",
-        "housemaid",
-        "management",
-        "retired",
-        "self-employed",
-        "services",
-        "student",
-        "technician",
-        "unemployed",
-        "unknown",
-    ]
-    marital: Literal["married", "single", "divorced"]
-    education: Literal["primary", "secondary", "tertiary", "unknown"]
-    default: YesNo
-    balance: int
-    housing: YesNo
-    loan: YesNo
-    contact: Literal["cellular", "telephone", "unknown"]
-    day: int = Field(ge=1, le=31)
-    month: Literal[
-        "jan",
-        "feb",
-        "mar",
-        "apr",
-        "may",
-        "jun",
-        "jul",
-        "aug",
-        "sep",
-        "oct",
-        "nov",
-        "dec",
-    ]
-    campaign: int = Field(ge=1)
-    pdays: int = Field(ge=-1)
-    previous: int = Field(ge=0)
-    poutcome: Literal["failure", "other", "success", "unknown"]
 
 
 class Prediction(BaseModel):

@@ -30,3 +30,6 @@ docker-build: export
 
 docker-run:
 	docker run --rm -p 8000:8000 term-deposit-api:0.1
+
+batch:
+	python -m src.batch_score --input data/raw/bank-full.csv --sep ";" --output data/scored/call_list.csv
