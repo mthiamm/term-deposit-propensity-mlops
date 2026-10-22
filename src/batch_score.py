@@ -10,7 +10,8 @@ simpler than calling the API once per customer.
 
 import argparse
 import os
-import sys
+
+# import sys
 from pathlib import Path
 
 import mlflow
@@ -30,9 +31,23 @@ def load_customers(path: Path, sep: str) -> pd.DataFrame:
     df = pd.read_csv(path, sep=sep)
     missing = [c for c in CUSTOMER_COLUMNS if c not in df.columns]
     if missing:
-        raise SystemExit(f"Input is missing required columns: {missing}")
+        # raise SystemExit(f"Input is missing required columns: {missing}")
+        raise ValueError(f"Input is missing required columns: {missing}")
     # Keep only the fields the model uses; drops y, duration, anything extra.
     return df[CUSTOMER_COLUMNS]
+
+
+# def validate(df: pd.DataFrame) -> None:
+#     """Fail loudly on bad rows instead of scoring garbage."""
+#     try:
+#         TypeAdapter(list[Customer]).validate_python(df.to_dict("records"))
+#     except ValidationError as e:
+#         errors = e.errors()
+#         print(f"{len(errors)} validation error(s). First 5:", file=sys.stderr)
+#         for err in errors[:5]:
+#             row, field = err["loc"][0], err["loc"][1]
+#             print(f"  row {row}, field '{field}': {err['msg']}", file=sys.stderr)
+#         raise SystemExit(1)
 
 
 def validate(df: pd.DataFrame) -> None:
@@ -41,11 +56,12 @@ def validate(df: pd.DataFrame) -> None:
         TypeAdapter(list[Customer]).validate_python(df.to_dict("records"))
     except ValidationError as e:
         errors = e.errors()
-        print(f"{len(errors)} validation error(s). First 5:", file=sys.stderr)
+        lines = [f"{len(errors)} validation error(s). First 5:"]
         for err in errors[:5]:
-            row, field = err["loc"][0], err["loc"][1]
-            print(f"  row {row}, field '{field}': {err['msg']}", file=sys.stderr)
-        raise SystemExit(1)
+            lines.append(
+                f"  row {err['loc'][0]}, field '{err['loc'][1]}': {err['msg']}"
+            )
+        raise ValueError("\n".join(lines)) from None
 
 
 def score(df: pd.DataFrame) -> tuple[pd.Series, str]:
@@ -54,6 +70,20 @@ def score(df: pd.DataFrame) -> tuple[pd.Series, str]:
     model = mlflow.sklearn.load_model(MODEL_URI)
     X = encode(binarize_yes_no(df, BINARY_COLUMNS), feature_columns).astype("float64")
     return pd.Series(model.predict_proba(X)[:, 1], index=df.index), meta.run_id
+
+
+def build_call_list(
+    df: pd.DataFrame, proba: pd.Series, run_id: str, top_n: int | None = None
+) -> pd.DataFrame:
+    out = (
+        pd.DataFrame({"row_id": df.index, "probability": proba.to_numpy()})
+        .sort_values("probability", ascending=False)
+        .reset_index(drop=True)
+    )
+    out["rank"] = out.index + 1
+    out["decile"] = out.index * 10 // len(out) + 1  # 1 = best 10% of THIS batch
+    out["model_run_id"] = run_id
+    return out.head(top_n) if top_n else out
 
 
 def main() -> None:
@@ -68,17 +98,18 @@ def main() -> None:
     validate(df)
     proba, run_id = score(df)
 
-    out = (
-        pd.DataFrame({"row_id": df.index, "probability": proba.to_numpy()})
-        .sort_values("probability", ascending=False)
-        .reset_index(drop=True)
-    )
-    out["rank"] = out.index + 1
-    out["decile"] = out.index * 10 // len(out) + 1  # 1 = best 10% of THIS batch
-    out["model_run_id"] = run_id
-    if args.top_n:
-        out = out.head(args.top_n)
+    # out = (
+    #     pd.DataFrame({"row_id": df.index, "probability": proba.to_numpy()})
+    #     .sort_values("probability", ascending=False)
+    #     .reset_index(drop=True)
+    # )
+    # out["rank"] = out.index + 1
+    # out["decile"] = out.index * 10 // len(out) + 1  # 1 = best 10% of THIS batch
+    # out["model_run_id"] = run_id
+    # if args.top_n:
+    #     out = out.head(args.top_n)
 
+    out = build_call_list(df, proba, run_id, args.top_n)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     out.to_csv(args.output, index=False)
     print(f"Scored {len(df):,} customers with model run {run_id}")

@@ -33,3 +33,6 @@ docker-run:
 
 batch:
 	python -m src.batch_score --input data/raw/bank-full.csv --sep ";" --output data/scored/call_list.csv
+
+batch-flow:
+	python -m src.batch_flow
