@@ -36,3 +36,6 @@ batch:
 
 batch-flow:
 	python -m src.batch_flow
+
+test:
+	python -m pytest -q
