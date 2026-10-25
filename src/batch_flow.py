@@ -48,6 +48,9 @@ def batch_scoring(
     refresh: bool = False,
 ) -> str:
     logger = get_run_logger()
+    Path(output_path).unlink(
+        missing_ok=True
+    )  # a failed run must not leave an old list behind
     if refresh:
         refresh_model()
     df = load_and_validate(input_path, sep)

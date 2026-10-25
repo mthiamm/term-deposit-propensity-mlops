@@ -93,7 +93,7 @@ def main() -> None:
     ap.add_argument("--sep", default=",", help="CSV separator (bank-full.csv uses ';')")
     ap.add_argument("--top-n", type=int, default=None, help="keep only the N best")
     args = ap.parse_args()
-
+    args.output.unlink(missing_ok=True)
     df = load_customers(args.input, args.sep)
     validate(df)
     proba, run_id = score(df)
