@@ -26,10 +26,10 @@ export:
 	python -m src.export_model
 
 docker-build: export
-	docker build -t term-deposit-api:0.1 .
+	docker build -t term-deposit-api:0.2 .
 
 docker-run:
-	docker run --rm -p 8000:8000 term-deposit-api:0.1
+	docker run --rm -p 8000:8000 term-deposit-api:0.2
 
 batch:
 	python -m src.batch_score --input data/raw/bank-full.csv --sep ";" --output data/scored/call_list.csv
@@ -39,3 +39,7 @@ batch-flow:
 
 test:
 	python -m pytest -q
+
+docker-run-plain:
+	docker run --rm -p 8000:8000 term-deposit-api:0.2 \
+	  uvicorn src.serve:app --host 0.0.0.0 --port 8000
