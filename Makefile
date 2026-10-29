@@ -43,3 +43,12 @@ test:
 docker-run-plain:
 	docker run --rm -p 8000:8000 term-deposit-api:0.2 \
 	  uvicorn src.serve:app --host 0.0.0.0 --port 8000
+
+monitor-up:
+	docker compose up -d
+
+monitor-down:
+	docker compose down
+
+traffic:
+	python scripts/send_traffic.py --n 300 --delay 0.1
