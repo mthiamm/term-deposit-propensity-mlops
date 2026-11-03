@@ -52,3 +52,6 @@ monitor-down:
 
 traffic:
 	python scripts/send_traffic.py --n 300 --delay 0.1
+
+drift:
+	python -m src.drift
