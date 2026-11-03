@@ -25,6 +25,7 @@ OUT_DIR = Path("reports/drift")
 
 MAX_DRIFTED_INPUTS = 2  # alert at this many drifted input columns...
 
+
 # default/housing/loan are 0/1 flags after cleaning, so treat them as categories.
 CATEGORICAL = [
     "job",
@@ -39,6 +40,8 @@ CATEGORICAL = [
 ]
 NUMERIC = ["age", "balance", "day", "campaign", "pdays", "previous"]
 
+INPUT_COLUMNS = NUMERIC + CATEGORICAL  # the 15 raw fields the API accepts
+
 
 def add_scores(raw: pd.DataFrame, model, feature_columns: list[str]) -> pd.DataFrame:
     """Return the raw inputs plus the model's predicted probability."""
@@ -47,6 +50,19 @@ def add_scores(raw: pd.DataFrame, model, feature_columns: list[str]) -> pd.DataF
     out = inputs.copy()
     out["prediction"] = model.predict_proba(X)[:, 1]
     return out
+
+
+def load_model():
+    model = mlflow.sklearn.load_model(MODEL_DIR)
+    feature_columns = json.loads(FEATURES_JSON.read_text())["feature_columns"]
+    return model, feature_columns
+
+
+def load_reference(model, feature_columns) -> pd.DataFrame:
+    """Training rows plus their scores: the 'normal' to compare against."""
+    df = clean_data(load_data(RAW_DATA_PATH))
+    train, _val, _test = split_data(df)
+    return add_scores(train, model, feature_columns)
 
 
 def inject_drift(df: pd.DataFrame, seed: int = 0) -> pd.DataFrame:

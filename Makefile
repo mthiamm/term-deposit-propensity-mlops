@@ -55,3 +55,11 @@ traffic:
 
 drift:
 	python -m src.drift
+
+BATCH ?= data/monitoring/batch_clean.csv
+
+drift-batches:
+	python -m src.make_batches
+
+drift-flow:
+	python -m src.monitor_flow --input $(BATCH)
