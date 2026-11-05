@@ -15,6 +15,7 @@ from prefect import flow, get_run_logger, task
 
 from src import drift
 from src.features import BINARY_COLUMNS, binarize_yes_no
+from src.drift_metrics import push_drift_summary
 
 
 @task
@@ -41,6 +42,15 @@ def check_drift(batch: pd.DataFrame, name: str) -> dict:
     return summary
 
 
+@task
+def publish_metrics(summary: dict) -> None:
+    logger = get_run_logger()
+    try:
+        push_drift_summary(summary)
+    except Exception as exc:  # a monitoring outage must not hide the drift result
+        logger.warning("could not publish drift metrics: %s", exc)
+
+
 @flow(name="drift-check")
 def drift_check(input_path: str, sep: str = ";", name: str | None = None) -> dict:
     logger = get_run_logger()
@@ -55,6 +65,7 @@ def drift_check(input_path: str, sep: str = ";", name: str | None = None) -> dic
         summary["prediction_drifted"],
         name,
     )
+    publish_metrics(summary)
     if summary["alert"]:
         # Raising marks the run as Failed. That IS the alert.
         raise RuntimeError(

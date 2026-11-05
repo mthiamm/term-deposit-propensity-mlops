@@ -27,5 +27,10 @@ services:
     depends_on:
       - prometheus
 
+  pushgateway:
+    image: prom/pushgateway:v1.11.1
+    ports:
+      - "9091:9091"
+
 volumes:
   grafana-data:
