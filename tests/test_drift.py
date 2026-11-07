@@ -14,8 +14,8 @@ def make_df(n, seed, age_mean=40, balance_scale=1000, p_cellular=0.65):
             "balance": rng.exponential(balance_scale, n).round(),
             "day": rng.integers(1, 29, n),
             "campaign": rng.integers(1, 6, n),
-            "pdays": -1,
-            "previous": 0,
+            "pdays": rng.choice([-1, 90, 180], n, p=[0.8, 0.1, 0.1]),
+            "previous": rng.integers(0, 3, n),
             "job": rng.choice(["admin.", "technician", "services"], n),
             "marital": rng.choice(["married", "single"], n),
             "education": rng.choice(["secondary", "tertiary"], n),
@@ -24,9 +24,9 @@ def make_df(n, seed, age_mean=40, balance_scale=1000, p_cellular=0.65):
             ),
             "month": rng.choice(["may", "jun", "jul"], n),
             "poutcome": "unknown",
-            "default": 0,
+            "default": rng.choice([0, 1], n, p=[0.98, 0.02]),
             "housing": rng.integers(0, 2, n),
-            "loan": 0,
+            "loan": rng.integers(0, 2, n),
             "prediction": rng.beta(1, 8, n),
         }
     )
