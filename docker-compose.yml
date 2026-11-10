@@ -10,6 +10,8 @@ services:
       - "9090:9090"
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
     depends_on:
       - api
   grafana:
@@ -24,6 +26,7 @@ services:
     volumes:
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
       - grafana-data:/var/lib/grafana
+      - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
     depends_on:
       - prometheus
 
@@ -34,3 +37,4 @@ services:
 
 volumes:
   grafana-data:
+  prometheus-data:

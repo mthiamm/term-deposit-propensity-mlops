@@ -1,6 +1,6 @@
 # Term Deposit Propensity: End-to-End MLOps Pipeline
 
-Predicts which bank clients will subscribe to a term deposit, using the UCI Bank Marketing dataset. The project covers the full ML lifecycle: data preparation, experiment tracking, hyperparameter tuning, a model registry, workflow orchestration, and serving (online API and batch scoring).
+Predicts which bank clients will subscribe to a term deposit, using the UCI Bank Marketing dataset. The project covers the full ML lifecycle: data preparation, experiment tracking, hyperparameter tuning, a model registry, workflow orchestration, serving (online API and batch scoring), and monitoring with drift detection and alerting.
 
 ## Problem
 
@@ -23,6 +23,8 @@ Bank marketing campaigns are costly, and most calls don't convert. The model ran
 | Export | `make export` | Copies the champion to a self-contained `models/champion/` folder |
 | Online API | `make docker-build`, `make docker-run` | FastAPI service in a container on port 8000 |
 | Batch scoring | `make batch-flow` | Ranked call list for a customer file (Prefect flow) |
+| Monitoring stack | `make monitor-up`, `make traffic` | API, Prometheus, Grafana and Pushgateway; sample requests for the dashboard |
+| Drift check | `make drift-flow` | Drift report and alert for a customer batch (Prefect flow) |
 
 Run the training pipeline end to end: `make pipeline`
 
@@ -91,8 +93,10 @@ curl -s -X POST localhost:8000/predict -H "Content-Type: application/json" -d '{
 ```
 
 - `GET /health` reports status and which model run is loaded.
+- `GET /metrics` exposes Prometheus metrics (see [Monitoring](#monitoring)).
 - Inputs are validated strictly (allowed category values, ranges, no unknown fields). Invalid requests get a 422 instead of a silent wrong score.
 - The API returns a probability, not a yes/no. The cutoff is a business decision (call cost vs. subscription value, or call-center capacity).
+- The container runs `src.serve_monitored:app`, which is the same app with monitoring attached. Running `src.serve:app` directly gives the plain service.
 
 ### Batch scoring
 
@@ -111,40 +115,115 @@ Output columns: `row_id`, `probability`, `rank`, `decile` (1 = best 10% of that 
 
 - **One feature pipeline** (`src/features.py`) is shared by training, the API and batch scoring, to prevent training/serving skew.
 - **One input schema** (`src/schema.py`) is shared by the API and batch validation.
-- The container installs only serving dependencies (`requirements-serve.txt`), with versions pinned to those the model was trained with.
+- The container installs only serving dependencies (`requirements-serve.txt`), with versions pinned to those the model was trained with. Drift tooling (Evidently) is development-only and is not in the image.
+
+## Monitoring
+
+Three layers, each answering a different question:
+
+| Layer | Question | Tooling |
+|---|---|---|
+| Service health | Is the API up, fast and error-free? | Prometheus + Grafana |
+| Data and prediction drift | Do incoming customers still look like the training data? | Evidently |
+| Model performance | Are the predictions still correct? | Needs true outcomes, which arrive after a campaign ends (not covered yet) |
+
+```bash
+make docker-build        # image with /metrics enabled
+make monitor-up          # API, Prometheus (9090), Grafana (3000), Pushgateway (9091)
+make traffic             # send sample requests so the dashboard has data
+make drift-batches       # write a clean and a deliberately shifted demo batch
+make drift-flow BATCH=data/monitoring/batch_shifted.csv
+make monitor-down
+```
+
+### Service metrics
+
+`src/monitoring.py` adds request count, latency and predicted-probability metrics plus a `/metrics` endpoint to the API without modifying `src/serve.py`; `src/serve_monitored.py` is the container entrypoint. Prometheus scrapes the endpoint every 15 seconds and Grafana (login `admin` / `admin`, local use only) draws it.
+
+The predicted-probability histogram doubles as a label-free drift signal: on realistic traffic the average score sits near the training positive rate (about 0.12). Dashboard panels: requests per second by status, p95 latency, 5xx error rate, average predicted probability, and the drift panels below.
+
+### Drift checks
+
+`src/monitor_flow.py` is a Prefect flow that:
+
+1. validates a customer file (same columns as the API);
+2. scores it with the champion;
+3. compares the 15 raw input columns and the predicted score against the training split with Evidently (Wasserstein distance for numeric columns, Jensen-Shannon for categorical ones, threshold 0.1 per column);
+4. writes an HTML report to `reports/drift/` and publishes results to Prometheus through the Pushgateway;
+5. **fails the run when the alert rule fires**: 2 or more drifted input columns, or a drifted score distribution.
+
+Evidently's own dataset-level flag needs half of the columns to drift, which is too late for 15 inputs, hence the explicit rule. Demo results:
+
+| Batch | Drifted columns | Alert |
+|---|---|---|
+| Clean (random sample of the data) | none, highest score 0.025 | no |
+| Shifted (older customers, lower balances, more landline contact) | `age` 0.77, `contact` 0.31, `balance` 0.23 | yes |
+
+The shifted batch moved the score distribution only slightly (0.053, below the threshold), which is why both layers are monitored: input drift with stable scores is a warning to investigate, not proof of failure.
+
+`make drift` writes the same two reports from the test split, and `make test` covers the drift logic on synthetic data.
+
+### Alerts
+
+`monitoring/alerts.yml` defines six Prometheus rules, visible at http://localhost:9090/alerts:
+
+| Alert | Fires when |
+|---|---|
+| `ApiDown` | the API cannot be scraped for 1 minute |
+| `HighErrorRate` | more than 5% of requests return 5xx for 5 minutes |
+| `HighLatency` | p95 latency is above 250 ms for 5 minutes (baseline is about 24 ms) |
+| `PredictionLevelShift` | the hourly average predicted probability moves more than 0.05 from the 0.117 baseline (at least 200 predictions) |
+| `DriftDetected` | the latest drift check fired its alert |
+| `DriftCheckStale` | no drift check has reported in 25 hours, or none on record |
+
+### Limitations
+
+- Drift is measured against the training split. The dataset spans 2008 to 2010, so seasonality can look like drift on real data.
+- Prometheus and Grafana use named Docker volumes. The Pushgateway keeps only the latest drift result in memory, so after a restart the stale-check alert fires until the drift flow runs again.
+- The Grafana dashboard is built in the UI and is not stored in the repo.
+- Alerts are visible in Prometheus only. Notification routing (Alertmanager) is not set up, and the drift check is run on demand, not on a schedule.
 
 ## Tests
 
 ```bash
-make test            # 16 tests
+make test            # 21 tests
 ```
 
-Covers feature encoding (column order, unseen categories), input validation, call-list ranking, API behavior, and a check that the API and the batch job return the same score for the same customer. API tests need `make export` first and skip themselves otherwise.
+Covers feature encoding (column order, unseen categories), input validation, call-list ranking, API behavior, a check that the API and the batch job return the same score for the same customer, drift detection (no alert on matching distributions, alert on shifted ones, a guard against misparsed reports), and the metrics layer. API tests need `make export` first and skip themselves otherwise.
 
 ## Project structure
 
 ```
 src/
-  data_prep.py      load, clean, split, encode
-  features.py       shared feature transforms (training, API, batch)
-  schema.py         input contract for one customer
-  train.py          baseline models, MLflow tracking
-  tune.py           Optuna hyperparameter search
-  register.py       model registry and promotion gate
-  flow.py           Prefect training pipeline
-  export_model.py   export champion to a standalone folder
-  serve.py          FastAPI prediction service
-  batch_score.py    batch scoring and call-list ranking
-  batch_flow.py     Prefect batch scoring flow
-  ranking_report.py decile and lift report on the test set
-tests/              unit and API tests
-reports/            generated evaluation reports
-data/               raw, processed and scored data (not tracked)
-models/             exported model artifacts (not tracked)
-Dockerfile          serving image
+  data_prep.py        load, clean, split, encode
+  features.py         shared feature transforms (training, API, batch)
+  schema.py           input contract for one customer
+  train.py            baseline models, MLflow tracking
+  tune.py             Optuna hyperparameter search
+  register.py         model registry and promotion gate
+  flow.py             Prefect training pipeline
+  export_model.py     export champion to a standalone folder
+  serve.py            FastAPI prediction service
+  monitoring.py       Prometheus metrics layer for the API
+  serve_monitored.py  container entrypoint: serve.py plus monitoring
+  batch_score.py      batch scoring and call-list ranking
+  batch_flow.py       Prefect batch scoring flow
+  ranking_report.py   decile and lift report on the test set
+  drift.py            Evidently drift reports and the alert rule
+  drift_metrics.py    publishes drift results to the Pushgateway
+  make_batches.py     writes demo customer batches (clean and shifted)
+  monitor_flow.py     Prefect drift-check flow
+monitoring/           Prometheus config, alert rules, Grafana provisioning
+scripts/              traffic generator for the dashboard
+tests/                unit and API tests
+reports/              generated evaluation reports (drift reports are not tracked)
+data/                 raw, processed, scored and demo data (not tracked)
+models/               exported model artifacts (not tracked)
+docker-compose.yml    API, Prometheus, Grafana, Pushgateway
+Dockerfile            serving image
 requirements.txt          full development dependencies
 requirements-serve.txt    pinned serving dependencies
-Makefile            pipeline shortcuts
+Makefile              pipeline shortcuts
 ```
 
 ## Roadmap
@@ -156,5 +235,7 @@ Makefile            pipeline shortcuts
 - [x] Workflow orchestration
 - [x] Model deployment (containerized API and batch scoring)
 - [x] Unit and API tests
-- [ ] Monitoring and drift detection
+- [x] Monitoring and drift detection
 - [ ] CI and linting
+- [ ] Model performance monitoring once outcomes are available
+- [ ] Scheduled drift checks and alert notifications
