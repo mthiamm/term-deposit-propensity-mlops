@@ -1,0 +1,60 @@
+groups:
+  - name: service-health
+    rules:
+      - alert: ApiDown
+        expr: up{job="term-deposit-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Prometheus cannot scrape the prediction API
+
+      - alert: HighErrorRate
+        expr: >
+          sum(rate(api_requests_total{status=~"5.."}[5m]))
+          / sum(rate(api_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: More than 5 percent of API requests are failing with 5xx
+
+      - alert: HighLatency
+        expr: >
+          histogram_quantile(0.95,
+            sum by (le) (rate(api_request_duration_seconds_bucket[5m]))) > 0.25
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: p95 latency is above 250 ms
+
+  - name: model-health
+    rules:
+      - alert: PredictionLevelShift
+        expr: >
+          abs(
+            sum(increase(model_predicted_probability_sum[1h]))
+            / sum(increase(model_predicted_probability_count[1h])) - 0.117
+          ) > 0.05
+          and sum(increase(model_predicted_probability_count[1h])) > 200
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Average predicted probability moved away from the 0.117 training baseline
+
+      - alert: DriftDetected
+        expr: drift_check_alert == 1
+        labels:
+          severity: warning
+        annotations:
+          summary: The latest drift check flagged drifted inputs or scores
+
+      - alert: DriftCheckStale
+        expr: time() - drift_check_last_run_timestamp_seconds > 90000
+              or absent(drift_check_last_run_timestamp_seconds)
+        labels:
+          severity: warning
+        annotations:
+          summary: No drift check has run in the last 25 hours
