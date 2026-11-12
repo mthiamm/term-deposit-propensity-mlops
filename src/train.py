@@ -8,12 +8,11 @@ import mlflow.sklearn
 import pandas as pd
 from mlflow.models import infer_signature
 from sklearn.ensemble import HistGradientBoostingClassifier, RandomForestClassifier
+from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import average_precision_score, f1_score, roc_auc_score
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
-from sklearn.impute import SimpleImputer
-from sklearn.metrics import average_precision_score, f1_score, roc_auc_score
-
 
 PROCESSED = Path("data/processed")
 TARGET = "y"
@@ -41,9 +40,7 @@ def build_model(name: str, seed: int):
         return make_pipeline(
             SimpleImputer(strategy="median", add_indicator=True),
             StandardScaler(),
-            LogisticRegression(
-                max_iter=2000, class_weight="balanced", random_state=seed
-            ),
+            LogisticRegression(max_iter=2000, class_weight="balanced", random_state=seed),
         )
     if name == "rf":
         return RandomForestClassifier(
@@ -54,9 +51,7 @@ def build_model(name: str, seed: int):
             random_state=seed,
         )
     if name == "hgb":
-        return HistGradientBoostingClassifier(
-            learning_rate=0.08, max_depth=6, random_state=seed
-        )
+        return HistGradientBoostingClassifier(learning_rate=0.08, max_depth=6, random_state=seed)
     raise ValueError(f"Unknown model: {name}")
 
 

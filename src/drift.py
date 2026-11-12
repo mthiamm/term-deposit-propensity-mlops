@@ -137,9 +137,7 @@ def main() -> None:
 
     reference = add_scores(train, model, feature_columns)
     clean = add_scores(test, model, feature_columns)
-    shifted = add_scores(
-        inject_drift(test.drop(columns=[TARGET])), model, feature_columns
-    )
+    shifted = add_scores(inject_drift(test.drop(columns=[TARGET])), model, feature_columns)
 
     # run_report(reference, clean, "drift_clean")
     # run_report(reference, shifted, "drift_shifted")

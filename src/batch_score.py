@@ -58,9 +58,7 @@ def validate(df: pd.DataFrame) -> None:
         errors = e.errors()
         lines = [f"{len(errors)} validation error(s). First 5:"]
         for err in errors[:5]:
-            lines.append(
-                f"  row {err['loc'][0]}, field '{err['loc'][1]}': {err['msg']}"
-            )
+            lines.append(f"  row {err['loc'][0]}, field '{err['loc'][1]}': {err['msg']}")
         raise ValueError("\n".join(lines)) from None
 
 
@@ -113,9 +111,7 @@ def main() -> None:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     out.to_csv(args.output, index=False)
     print(f"Scored {len(df):,} customers with model run {run_id}")
-    print(
-        f"Mean probability {proba.mean():.3f} | share >= 0.5: {(proba >= 0.5).mean():.1%}"
-    )
+    print(f"Mean probability {proba.mean():.3f} | share >= 0.5: {(proba >= 0.5).mean():.1%}")
     print(f"Wrote {len(out):,} rows -> {args.output}")
 
 

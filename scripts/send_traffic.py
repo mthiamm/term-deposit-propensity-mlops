@@ -35,9 +35,7 @@ parser.add_argument("--delay", type=float, default=0.1)
 parser.add_argument("--url", default="http://localhost:8000/predict")
 args = parser.parse_args()
 
-df = pd.read_csv("data/raw/bank-full.csv", sep=";")[FIELDS].sample(
-    args.n, random_state=None
-)
+df = pd.read_csv("data/raw/bank-full.csv", sep=";")[FIELDS].sample(args.n, random_state=None)
 rows = json.loads(df.to_json(orient="records"))  # plain Python types
 
 ok = bad = 0

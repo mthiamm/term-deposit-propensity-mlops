@@ -14,8 +14,8 @@ import pandas as pd
 from prefect import flow, get_run_logger, task
 
 from src import drift
-from src.features import BINARY_COLUMNS, binarize_yes_no
 from src.drift_metrics import push_drift_summary
+from src.features import BINARY_COLUMNS, binarize_yes_no
 
 
 @task

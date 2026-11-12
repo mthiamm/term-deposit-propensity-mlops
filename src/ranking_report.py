@@ -97,9 +97,7 @@ def build_report(df: pd.DataFrame) -> str:
         )
 
     calls_all = n / subs
-    calls_top2 = (top1.customers + top2.customers) / (
-        top1.subscribers + top2.subscribers
-    )
+    calls_top2 = (top1.customers + top2.customers) / (top1.subscribers + top2.subscribers)
     lines += [
         "",
         f"- Top 10% of customers capture **{top1.cum_subscribers:.0%}** of subscribers "
