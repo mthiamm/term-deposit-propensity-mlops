@@ -47,6 +47,11 @@ def current_champion_val_pr_auc() -> float | None:
     return client.get_run(mv.run_id).data.metrics.get("val_pr_auc")
 
 
+def should_promote(candidate: float, champion: float | None, min_delta: float = MIN_DELTA) -> bool:
+    """Promote if there is no champion, or the candidate beats it by more than min_delta."""
+    return champion is None or candidate > champion + min_delta
+
+
 def main(min_delta: float = MIN_DELTA) -> dict:
     mlflow.set_tracking_uri(TRACKING_URI)
     mlflow.set_experiment(EXPERIMENT)
@@ -64,7 +69,7 @@ def main(min_delta: float = MIN_DELTA) -> dict:
         te_p = model.predict_proba(X_te)[:, 1]
         val_pr_auc = average_precision_score(y_val, val_p)
         test_pr_auc = average_precision_score(y_te, te_p)
-        promote = champ_val is None or val_pr_auc > champ_val + min_delta
+        promote = should_promote(val_pr_auc, champ_val, min_delta)
 
         mlflow.log_metrics(
             {
