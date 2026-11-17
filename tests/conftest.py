@@ -116,3 +116,14 @@ def customer() -> dict:
         "previous": 0,
         "poutcome": "unknown",
     }
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """In CI, a skipped test means a hole in the safety net: fail the run."""
+    if os.getenv("CI") != "true":
+        return
+    reporter = session.config.pluginmanager.get_plugin("terminalreporter")
+    skipped = reporter.stats.get("skipped", []) if reporter else []
+    if skipped and session.exitstatus == 0:
+        print(f"\nCI guard: {len(skipped)} test(s) skipped. Skips are not allowed in CI.")
+        session.exitstatus = pytest.ExitCode.TESTS_FAILED
