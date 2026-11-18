@@ -19,9 +19,7 @@ def make_df(n, seed, age_mean=40, balance_scale=1000, p_cellular=0.65):
             "job": rng.choice(["admin.", "technician", "services"], n),
             "marital": rng.choice(["married", "single"], n),
             "education": rng.choice(["secondary", "tertiary"], n),
-            "contact": rng.choice(
-                ["cellular", "telephone"], n, p=[p_cellular, 1 - p_cellular]
-            ),
+            "contact": rng.choice(["cellular", "telephone"], n, p=[p_cellular, 1 - p_cellular]),
             "month": rng.choice(["may", "jun", "jul"], n),
             "poutcome": "unknown",
             "default": rng.choice([0, 1], n, p=[0.98, 0.02]),
@@ -62,9 +60,7 @@ def test_summarize_fails_loudly_when_counts_disagree():
                 {
                     "metrics": [
                         {
-                            "config": {
-                                "type": "evidently:metric_v2:DriftedColumnsCount"
-                            },
+                            "config": {"type": "evidently:metric_v2:DriftedColumnsCount"},
                             "value": {"count": 2.0, "share": 0.5},
                         },
                         {

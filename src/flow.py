@@ -25,9 +25,7 @@ def register_model(min_delta: float = MIN_DELTA) -> dict:
 
 
 @flow(name="term-deposit-training-pipeline", log_prints=True)
-def training_pipeline(
-    trials: int = 30, model: str = "hgb", min_delta: float = MIN_DELTA
-) -> dict:
+def training_pipeline(trials: int = 30, model: str = "hgb", min_delta: float = MIN_DELTA) -> dict:
     prep()
     baseline(model)
     tune_model(trials)

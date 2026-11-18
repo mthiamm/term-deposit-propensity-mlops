@@ -4,14 +4,14 @@ import json
 import mlflow
 import pandas as pd
 from mlflow import MlflowClient
+from mlflow.exceptions import MlflowException
 from mlflow.models import infer_signature
 from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.metrics import average_precision_score, roc_auc_score
 
 from src.train import PROCESSED, TRACKING_URI, load_data
-from src.tune import EXPERIMENT as TUNING_EXPERIMENT, FIXED
-
-from mlflow.exceptions import MlflowException
+from src.tune import EXPERIMENT as TUNING_EXPERIMENT
+from src.tune import FIXED
 
 MODEL_NAME = "bank-marketing-classifier"
 EXPERIMENT = "bank-marketing - final"
@@ -47,6 +47,11 @@ def current_champion_val_pr_auc() -> float | None:
     return client.get_run(mv.run_id).data.metrics.get("val_pr_auc")
 
 
+def should_promote(candidate: float, champion: float | None, min_delta: float = MIN_DELTA) -> bool:
+    """Promote if there is no champion, or the candidate beats it by more than min_delta."""
+    return champion is None or candidate > champion + min_delta
+
+
 def main(min_delta: float = MIN_DELTA) -> dict:
     mlflow.set_tracking_uri(TRACKING_URI)
     mlflow.set_experiment(EXPERIMENT)
@@ -64,7 +69,7 @@ def main(min_delta: float = MIN_DELTA) -> dict:
         te_p = model.predict_proba(X_te)[:, 1]
         val_pr_auc = average_precision_score(y_val, val_p)
         test_pr_auc = average_precision_score(y_te, te_p)
-        promote = champ_val is None or val_pr_auc > champ_val + min_delta
+        promote = should_promote(val_pr_auc, champ_val, min_delta)
 
         mlflow.log_metrics(
             {
@@ -76,9 +81,7 @@ def main(min_delta: float = MIN_DELTA) -> dict:
             }
         )
         mlflow.log_params({**best, "seed": SEED})
-        mlflow.set_tags(
-            {"tuning_run_id": tuning_run_id, "promoted": str(promote).lower()}
-        )
+        mlflow.set_tags({"tuning_run_id": tuning_run_id, "promoted": str(promote).lower()})
         mlflow.log_artifact(str(PROCESSED / "feature_columns.json"))
 
         result = {
@@ -101,13 +104,9 @@ def main(min_delta: float = MIN_DELTA) -> dict:
                 MODEL_NAME, "champion", info.registered_model_version
             )
             result["version"] = info.registered_model_version
-            print(
-                f"Registered {MODEL_NAME} v{info.registered_model_version} as @champion"
-            )
+            print(f"Registered {MODEL_NAME} v{info.registered_model_version} as @champion")
         else:
-            print(
-                f"Not promoted: val PR-AUC {val_pr_auc:.4f} vs champion {champ_val:.4f}"
-            )
+            print(f"Not promoted: val PR-AUC {val_pr_auc:.4f} vs champion {champ_val:.4f}")
 
     return result
 

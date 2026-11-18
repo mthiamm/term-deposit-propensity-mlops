@@ -7,7 +7,6 @@ Docs UI (auto-generated): http://localhost:8000/docs
 
 import os
 from contextlib import asynccontextmanager
-from src.schema import Customer
 
 import mlflow
 import pandas as pd
@@ -18,6 +17,7 @@ from mlflow.models import Model
 from pydantic import BaseModel
 
 from src.features import BINARY_COLUMNS, binarize_yes_no, encode
+from src.schema import Customer
 
 # Config comes from the environment so Docker can override it later.
 TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db")

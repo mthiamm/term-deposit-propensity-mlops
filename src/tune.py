@@ -3,7 +3,7 @@ import argparse
 
 import mlflow
 import optuna
-from sklearn.ensemble import HistGradientBoostingClassifier, RandomForestClassifier
+from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.metrics import average_precision_score, roc_auc_score
 
 from src.train import TRACKING_URI, load_data
@@ -68,7 +68,7 @@ def main(argv=None):
             )
             return pr_auc
 
-    with mlflow.start_run(run_name=f"hgb-optuna-study") as parent:
+    with mlflow.start_run(run_name="hgb-optuna-study") as parent:
         study = optuna.create_study(
             direction="maximize", sampler=optuna.samplers.TPESampler(seed=args.seed)
         )
