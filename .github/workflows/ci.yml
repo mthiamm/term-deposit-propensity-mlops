@@ -13,6 +13,13 @@ jobs:
   checks:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    services:
+      localstack:
+        image: localstack/localstack:4.12
+        ports:
+          - 4566:4566
+        env:
+          SERVICES: s3  
     steps:
       - name: Check out the code
         uses: actions/checkout@v6
@@ -32,6 +39,15 @@ jobs:
 
       - name: Check formatting
         run: ruff format --check .
+        
+      - name: Wait for LocalStack
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:4566/_localstack/health; then exit 0; fi
+            sleep 2
+          done
+          echo "LocalStack never became ready"
+          exit 1
 
       - name: Run tests
         run: pytest -q --cov=src --cov-report=term-missing
