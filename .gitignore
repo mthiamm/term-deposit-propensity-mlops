@@ -10,3 +10,6 @@ __pycache__/
 .DS_Store
 data_prep_old_before_serving.py
 reports/drift/
+.terraform/
+*.tfstate
+*.tfstate.*
