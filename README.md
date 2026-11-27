@@ -117,6 +117,8 @@ Output columns: `row_id`, `probability`, `rank`, `decile` (1 = best 10% of that 
 - **One input schema** (`src/schema.py`) is shared by the API and batch validation.
 - The container installs only serving dependencies (`requirements-serve.txt`), with versions pinned to those the model was trained with. Drift tooling (Evidently) is development-only and is not in the image.
 
+
+
 ## Monitoring
 
 Three layers, each answering a different question:
@@ -183,13 +185,46 @@ The shifted batch moved the score distribution only slightly (0.053, below the t
 - The Grafana dashboard is built in the UI and is not stored in the repo.
 - Alerts are visible in Prometheus only. Notification routing (Alertmanager) is not set up, and the drift check is run on demand, not on a schedule.
 
-## Tests
+## Model storage and infrastructure
+
+The exported champion can be published to S3-compatible storage and fetched from it, so training and serving never need to share a filesystem or a registry database.
 
 ```bash
-make test            # 21 tests
+docker compose -f docker-compose.localstack.yml up -d     # local S3 (LocalStack)
+(cd infra && terraform init && terraform apply)           # creates the model bucket
+export AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_DEFAULT_REGION=us-east-1
+export S3_ENDPOINT_URL=http://localhost:4566
+python -m src.storage upload                              # models/champion -> S3
+python -m src.storage download --dest models/champion_from_s3
 ```
 
-Covers feature encoding (column order, unseen categories), input validation, call-list ranking, API behavior, a check that the API and the batch job return the same score for the same customer, drift detection (no alert on matching distributions, alert on shifted ones, a guard against misparsed reports), and the metrics layer. API tests need `make export` first and skip themselves otherwise.
+- `src/storage.py` reads its configuration from environment variables: leave `S3_ENDPOINT_URL` unset to target real AWS.
+- `infra/main.tf` declares the bucket (versioning on, all public access blocked). Its `localstack` variable defaults to `true`; set `-var localstack=false` to target a real account.
+- LocalStack is pinned to `4.12`, the last release that runs without an account or auth token.
+- Terraform state is local and not tracked. `force_destroy` is deliberately off, so a bucket holding models can't be deleted by accident.
+
+## Tests and CI
+
+```bash
+make test            # 36 tests
+ruff check . && ruff format --check .
+```
+
+Covers feature encoding (column order, unseen categories), data prep (leakage column dropped, no overlap between splits, stratification preserved, encoding aligned across splits), the promotion gate (margin and edge cases), input validation, call-list ranking, API behavior, a check that the API and the batch job return the same score for the same customer, drift detection, the metrics layer and S3 model storage.
+
+Tests never depend on a trained model or a local registry. A shared helper (`tests/fake_model.py`) builds a tiny throwaway model in the same layout as the real export, so the suite runs identically on a laptop and on a clean CI machine.
+
+### Continuous integration
+
+Every push and pull request runs three jobs (`.github/workflows/ci.yml`), and all three must pass before anything merges to `main`:
+
+| Job | What it checks |
+|---|---|
+| `checks` | Lint, format check, and the full test suite with coverage, against a LocalStack S3 service container |
+| `docker-smoke` | Builds the serving image, starts it, and verifies `/health`, `/predict` and `/metrics` |
+| `terraform` | Format check, validation, an apply against LocalStack, and a second plan that must show no changes |
+
+Skipped tests fail the CI run. A skip locally just means something isn't set up; in CI it would mean part of the safety net silently disappeared.
 
 ## Project structure
 
@@ -224,6 +259,17 @@ Dockerfile            serving image
 requirements.txt          full development dependencies
 requirements-serve.txt    pinned serving dependencies
 Makefile              pipeline shortcuts
+src/
+  storage.py          publish/fetch the exported model through S3
+tests/
+  fake_model.py       builds a throwaway model for tests and the CI smoke test
+infra/
+  main.tf             Terraform: model bucket (versioned, private)
+.github/workflows/
+  ci.yml              lint, tests, Docker smoke test, Terraform checks
+docker-compose.localstack.yml   local S3 for development and tests
+pytest.ini, ruff.toml           test and lint configuration
+requirements-dev.txt            pinned test and lint tools
 ```
 
 ## Roadmap
@@ -236,6 +282,5 @@ Makefile              pipeline shortcuts
 - [x] Model deployment (containerized API and batch scoring)
 - [x] Unit and API tests
 - [x] Monitoring and drift detection
-- [ ] CI and linting
-- [ ] Model performance monitoring once outcomes are available
-- [ ] Scheduled drift checks and alert notifications
+- [x] CI and linting
+- [x] Model storage in S3 and infrastructure as code (Terraform)
